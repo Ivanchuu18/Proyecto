@@ -1,4 +1,4 @@
-from Proyecto.Doc.config import CONTRASENA, USUARIO
+from config import CONTRASENA, USUARIO
 
 class Admin:
     def __init__(self, usuario, contrasena):

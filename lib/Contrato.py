@@ -1,8 +1,9 @@
+from enum_estados import Estados
 class Contrato:
     def __int__(self, fecha_entrega, fecha_devolucion, estado):
         self._fecha_entrega = fecha_entrega
         self._fecha_devolucion = fecha_devolucion
-        self._estado = estado
+        self._estado = estado if estado in Estados else Estados.PRESTADO
 
     def __str__(self):
         return f"Fecha de entrega: {self._fecha_entrega}, Fecha de devolucion: {self._fecha_devolucion}, Estado: {self._estado}"
