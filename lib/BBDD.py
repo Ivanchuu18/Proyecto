@@ -1,13 +1,14 @@
 from config import DATABASE, USER, PASSWORD, HOST
 import mysql.connector
 from mysql.connector import errorcode
-import re
+from datetime import date
+from dateutil.relativedelta import relativedelta
 
 class BBDD:
 
     def conexion(self):
         """
-        Esta función establece una conexión a la base de datos SQLite.
+        Esta función establece una conexión a la base de datos MySQL
         """
         try:
             cnx = mysql.connector.connect(user=USER, password=PASSWORD, host=HOST, database=DATABASE)
@@ -31,7 +32,7 @@ class BBDD:
         Esta función elimina la base de datos SQLite.
         """
         tablas = ["alumnos",
-                  "alumnoscrusoslibros",
+                  "prestamos",
                   "cursos",
                   "libros",
                   "materias"]
@@ -58,50 +59,7 @@ class BBDD:
         self.cargar_libros()
 
 
-    def cargar_alumnos(self):
-        """
-        Esta función carga los datos de los alumnos en la base de datos.
-        """
 
-        conexion = self.conexion()
-        if not conexion:
-            return
-        cursor = conexion.cursor()
-        try:
-            validar = False
-            while not validar:
-                nie = input("Introduzca el DNI del alumno: ")
-                aux = self.validar_dni(nie)
-                if aux == True:
-                    validar = True
-                else:
-                    print(aux)
-
-            nombre = input("Introduzca el nombre del alumno: ")
-            apellidos = input("Introduzca los apellidos del alumno: ")
-            while validar:
-                tramo = input("Introduzca el tramo del alumno: (0 nada, I tramo 1, II tramo 2): ")
-                aux = self.validar_tramo(int(tramo))
-                if aux == True:
-                    validar = False
-                else:
-                    print(aux)
-            while not validar:
-                bilingue = input("Introduzca si el alumno es bilingue: (0 si, 1 no): ")
-                aux = self.bilingue(int(bilingue))
-                if aux == True:
-                    validar = True
-                else:
-                    print(aux)
-            cursor.execute("INSERT INTO alumnos (nie, nombre, apellidos, tramo, bilingue) VALUES (%s, %s, %s, %s, %s)",
-                               (nie, nombre, apellidos, tramo, bilingue))
-            conexion.commit()
-        except mysql.connector.Error as err:
-            print(err)
-
-        finally:
-            cursor.close()
-            self.cerrar(conexion)
 
     def cargar_alumnos_inicial(self):
         """
@@ -113,7 +71,8 @@ class BBDD:
             return
         cursor = conexion.cursor()
         try:
-            with open("Csv/Carga_inicial/ci_alumnos.csv", "r", encoding="utf-8") as f:
+            from Proyecto.lib.Gestion_alumnos import GestionAlumnos
+            with open("Proyecto/lib/Csv/Carga_inicial/ci_alumnos.csv", "r", encoding="utf-8") as f:
                 contenido = f.readlines()
                 # Empieza desde línea 2 para el conteo humano
                 for i, linea in enumerate(contenido[1:], start=2):
@@ -135,15 +94,15 @@ class BBDD:
                         print(f"El DNI {nie} ya existe en la base de datos.")
                         continue
                     # Validar DNI si no esta en la Base de datos
-                    if not self.validar_dni(nie):
+                    if not GestionAlumnos().validar_dni(nie):
                         print(f"El DNI {nie} no es válido.")
                         continue
                     # Validar el tramo
-                    if not self.validar_tramo(int(tramo)):
+                    if not GestionAlumnos().validar_tramo(int(tramo)):
                         print(f"El tramo {tramo} no es válido.")
                         continue
                     # Validar el bilingue
-                    if not self.bilingue(int(bilingue)):
+                    if not GestionAlumnos().bilingue(int(bilingue)):
                         print(f"El valor de bilingue {bilingue} no es válido.")
                         continue
                     else:
@@ -167,11 +126,11 @@ class BBDD:
             return
         cursor = conexion.cursor()
         try:
-            with open("Csv/Carga_inicial/ci_libros.csv", "r", encoding="utf-8") as f:
+            with open("Proyecto/lib/Csv/Carga_inicial/ci_libros.csv", "r", encoding="utf-8") as f:
                 contenido = f.readlines()
                 # Empieza desde línea 2 para el conteo humano
                 for i, linea in enumerate(contenido[1:], start=2):
-                    columnas = linea.strip().replace('"', '').split(";")
+                    columnas = linea.strip().split(";")
                     # Línea vacía
                     if not linea:
                         continue
@@ -179,11 +138,11 @@ class BBDD:
                     if len(columnas) < 6:
                         print(f"Línea {i} incompleta")
                         continue
-                    isbn = columnas[0]
+                    isbn = columnas[0].replace('"', '')
                     titulo = columnas[1]
                     autor = columnas[2]
-                    numero_ejemplares = int(columnas[3])
-                    id_materia = int(columnas[4])
+                    numero_ejemplares = int(columnas[3].replace('"', ''))
+                    id_materia = int(columnas[4].replace('"', ''))
                     id_curso = columnas[5]
 
                     # Validar el ISBN
@@ -225,7 +184,7 @@ class BBDD:
             return
         cursor = conexion.cursor()
         try:
-            with open("Csv/Carga_inicial/ci_materia.csv", "r", encoding="utf-8") as f:
+            with open("Proyecto/lib/Csv/Carga_inicial/ci_materia.csv", "r", encoding="utf-8") as f:
                 contenido = f.readlines()
                 # Empieza desde línea 2 para el conteo humano
                 for i, linea in enumerate(contenido[1:], start=2):
@@ -262,7 +221,7 @@ class BBDD:
             return
         cursor = conexion.cursor()
         try:
-            with open("Csv/Carga_inicial/ci_cursos.csv", "r", encoding="utf-8") as f:
+            with open("Proyecto/lib/Csv/Carga_inicial/ci_cursos.csv", "r", encoding="utf-8") as f:
                 contenido = f.readlines()
                 # Empieza desde línea 2 para el conteo humano
                 for i, linea in enumerate(contenido[1:], start=2):
@@ -310,44 +269,6 @@ class BBDD:
         return True
 
 
-    def validar_nivel(self, grupo):
-        # Verificar si el nivel es uno de los valores permitidos
-        niveles_permitidos = ["A", "B", "C", "D"]
-        if grupo in niveles_permitidos:
-            return True
-        else:
-            raise ValueError("Nivel no válido. Debe ser uno de los siguientes: A, B, C, D.")
-
-    def validar_dni(self, dni: str) -> ValueError | bool:
-        # Convertir a mayúsculas y eliminar espacios
-        dni_alumno = dni.upper().strip()
-
-        # Expresión regular para verificar el formato: 8 dígitos seguidos de una letra
-        if not re.fullmatch(r'\d{8}[A-Z]', dni_alumno):
-            return ValueError("Formato de DNI no válido. Debe tener 8 dígitos seguidos de una letra.")
-
-        # Secuencia de letras para calcular la letra del DNI
-        letras = 'TRWAGMYFPDXBNJZSQVHLCKE'
-        numero = int(dni_alumno[:8])
-        letra_calculada = letras[numero % 23]
-
-        # Comparar la letra calculada con la letra proporcionada
-        if dni_alumno[-1] == letra_calculada:
-            return True
-        else:
-            return ValueError("La letra del DNI no es correcta. Debe ser: " + letra_calculada)
-
-    def validar_tramo(self, tramo: int) -> bool:
-        # Verificar si el tramo está entre 0 y 2
-        return 0 <= tramo <= 2
-
-    def bilingue(self, bilingue) -> bool | ValueError:
-        # Verificar si el alumno es bilingüe
-        if bilingue == 0 or bilingue == 1:
-            return True
-        else:
-            return ValueError("Los valores permitidos son: 0 (si) o 1 (no)")
-
     def validar_isbn(self, isbn):
         # Verificar si el ISBN tiene 13 dígitos
         if len(isbn) != 13:
@@ -373,55 +294,6 @@ class BBDD:
         else:
             return ValueError("El ISBN no es válido. El dígito de control no coincide.")
 
-    def filtrar_alumnos(self):
-        """
-        Filtra la lista de alumnos según el criterio de búsqueda.
-        """
-        alumnos_filtrados = {}
-        contador = 1
-        conexion = self.conexion()
-        filas = ["apellidos", "nombre", "dni"]
-        # Verificar si la conexión fue exitosa
-        if not conexion:
-            return False
-        cursor = conexion.cursor()
-        try:
-            # Solicitar al usuario el criterio de búsqueda
-            while True:
-                criterio = input("Introduzca el criterio de búsqueda (nombre, apellidos, dni): ").lower()
-                if criterio in filas:
-                    break
-                else:
-                    print("Criterio no válido. Debe ser uno de los siguientes: nombre, apellidos, dni.")
-            valor = input("Introduzca el valor a buscar: ")
-
-            # Realizar la consulta SQL con el filtro
-            query = f"SELECT * FROM alumnos WHERE {criterio} LIKE %s"
-            cursor.execute(query, ('%' + valor + '%',))
-            resultados = cursor.fetchall()
-
-            # Mostrar los resultados
-            if not resultados:
-                print("No se encontraron resultados.")
-                opcion = input("Quieres volver a intentar? (s/n): ")
-                if opcion.lower() == "s":
-                    self.filtrar_alumnos()
-                else:
-                    print("Saliendo...")
-            else:
-                print(f"Se encontraron {len(resultados)} resultados:")
-                print("-" * 50)
-                for fila in resultados:
-                    print(contador, fila)
-                    alumnos_filtrados[contador] = fila
-                    contador += 1
-                print("-" * 50)
-        except mysql.connector.Error as err:
-            print(err)
-        finally:
-            cursor.close()
-            BBDD().cerrar(conexion)
-            return alumnos_filtrados
 
     def validar_idmateria(self, id_materia):
         # Verificar si el ID de materia es un número entero
@@ -499,120 +371,3 @@ class BBDD:
             cursor.close()
             self.cerrar(conexion)
         return False
-
-    def modificar_alumno(self, alumnos_filtrados:dict):
-
-        """
-        Modifica los datos de un alumno en la base de datos.
-        """
-        filas = [
-            "nombre",
-            "apellidos",
-            "tramo",
-            "bilingue"
-        ]
-        conexion = self.conexion()
-        # Verificar si la conexión fue exitosa
-        if not conexion:
-            return False
-        cursor = conexion.cursor()
-        try:
-
-            while True:
-                # Solicitar al usuario el número del alumno a modificar
-                opcion = int(input("Seleccione el número del alumno a modificar: "))
-                if opcion in alumnos_filtrados:
-                    alumno = alumnos_filtrados[opcion]
-                    criterio = input("Introduzca el criterio de modificar (nombre, apellidos, tramo, bilingue): ")
-                    if criterio in filas:
-                        break
-                    else:
-                        print("Criterio no válido. Debe ser uno de los siguientes: nombre, apellidos, tramo, bilingue.")
-                else:
-                    print("Opción no válida. Intente nuevamente.")
-            valor = input("Introduzca el nuevo valor: ")
-            # Realizar la consulta SQL con el filtro
-            query = f"UPDATE alumnos SET {criterio} = %s WHERE nie = %s"
-            cursor.execute(query, (valor, alumno[0]))
-            conexion.commit()
-        except mysql.connector.Error as err:
-            print(err)
-        except ValueError:
-            print("Opción no válida. Debe ser un número.")
-        finally:
-            cursor.close()
-            self.cerrar(conexion)
-
-
-    def generar_contrato(self, alumnos_filtrados:dict):
-        """
-        Genera un contrato para un alumno en la base de datos.
-        """
-        conexion = self.conexion()
-        # Verificar si la conexión fue exitosa
-        if not conexion:
-            return False
-        cursor = conexion.cursor()
-        try:
-            while True:
-                # Solicitar al usuario el número del alumno a modificar
-                opcion = int(input("Seleccione el número del alumno para generar el contrato: "))
-                if opcion in alumnos_filtrados:
-                    alumno = alumnos_filtrados[opcion]
-                    break
-                else:
-                    print("Opción no válida. Intente nuevamente.")
-            # Realizar la consulta SQL con el filtro
-            query = f"SELECT * FROM alumnos WHERE nie = %s"
-            cursor.execute(query, (alumno[0],))
-            resultado = cursor.fetchone()
-            print(resultado)
-        except mysql.connector.Error as err:
-            print(err)
-        except ValueError:
-            print("Opción no válida. Debe ser un número.")
-        finally:
-            cursor.close()
-            self.cerrar(conexion)
-
-    def listado_libros(self):
-        """
-        Muestra un listado de libros en la base de datos.
-        """
-        libros = {}
-        contador = 1
-        conexion = self.conexion()
-        # Verificar si la conexión fue exitosa
-        if not conexion:
-            return False
-        cursor = conexion.cursor()
-        try:
-            # Realizar la consulta SQL para obtener todos los libros
-            query = "SELECT * FROM libros"
-            cursor.execute(query)
-            resultados = cursor.fetchall()
-
-            # Mostrar los resultados
-            if not resultados:
-                print("No se encontraron resultados.")
-                opcion = input("Quieres volver a intentar? (s/n): ")
-                if opcion.lower() == "s":
-                    self.listado_libros()
-                else:
-                    print("Saliendo...")
-            else:
-                print(f"Se encontraron {len(resultados)} resultados:")
-                print("-" * 50)
-                for fila in resultados:
-                    print(fila)
-                    libros[contador] = fila
-                    contador += 1
-                print("-" * 50)
-        except mysql.connector.Error as err:
-            print(err)
-        finally:
-            cursor.close()
-            self.cerrar(conexion)
-            return libros
-
-BBDD().cargar_libros()

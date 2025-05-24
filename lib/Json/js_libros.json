@@ -1,0 +1,18 @@
+[
+    {
+        "isbn": "9780306406157",
+        "titulo": "\"Matemáticas 1\"",
+        "autor": "\"Editorial A\"",
+        "numero_ejemplares": 8,
+        "id_materia": 1,
+        "id_curso": "\"1-ESO\""
+    },
+    {
+        "isbn": "9783161484100",
+        "titulo": "\"Matemáticas 2\"",
+        "autor": "\"Editorial A\"",
+        "numero_ejemplares": 0,
+        "id_materia": 1,
+        "id_curso": "\"2-ESO\""
+    }
+]
