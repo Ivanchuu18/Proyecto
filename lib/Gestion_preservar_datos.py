@@ -133,3 +133,4 @@ class Gestion_preservar_datos:
     def limpiar_comillas(self, cadena):
         if isinstance(cadena, str):
             return cadena.replace('"', '')
+        return cadena
